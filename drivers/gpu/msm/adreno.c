@@ -289,10 +289,6 @@ static void adreno_iommu_setstate(struct kgsl_device *device,
 				KGSL_IOMMU_CONTEXT_USER))
 		goto done;
 
-	cmds += __adreno_add_idle_indirect_cmds(cmds,
-		device->mmu.setstate_memory.gpuaddr +
-		KGSL_IOMMU_SETSTATE_NOP_OFFSET);
-
 	if (cpu_is_msm8960())
 		cmds += adreno_add_change_mh_phys_limit_cmds(cmds, 0xFFFFF000,
 					device->mmu.setstate_memory.gpuaddr +
@@ -361,9 +357,10 @@ static void adreno_iommu_setstate(struct kgsl_device *device,
 		*cmds++ = cp_type3_packet(CP_INVALIDATE_STATE, 1);
 		*cmds++ = 0x7fff;
 
-		cmds += __adreno_add_idle_indirect_cmds(cmds,
-			device->mmu.setstate_memory.gpuaddr +
-			KGSL_IOMMU_SETSTATE_NOP_OFFSET);
+		if (flags & KGSL_MMUFLAGS_TLBFLUSH)
+			cmds += __adreno_add_idle_indirect_cmds(cmds,
+				device->mmu.setstate_memory.gpuaddr +
+				KGSL_IOMMU_SETSTATE_NOP_OFFSET);
 	}
 	if (flags & KGSL_MMUFLAGS_TLBFLUSH) {
 		/*
@@ -376,11 +373,6 @@ static void adreno_iommu_setstate(struct kgsl_device *device,
 				KGSL_IOMMU_CTX_SHIFT) +
 				KGSL_IOMMU_CTX_TLBIASID);
 			*cmds++ = kgsl_mmu_get_hwpagetable_asid(&device->mmu);
-
-			cmds += __adreno_add_idle_indirect_cmds(cmds,
-			device->mmu.setstate_memory.gpuaddr +
-			KGSL_IOMMU_SETSTATE_NOP_OFFSET);
-
 			cmds += adreno_add_read_cmds(device, cmds,
 				reg_map_desc[i]->gpuaddr +
 				(KGSL_IOMMU_CONTEXT_USER <<
@@ -1597,6 +1589,13 @@ static int adreno_waittimestamp(struct kgsl_device *device,
 	} while (time_elapsed < msecs);
 
 hang_dump:
+	/*
+	 * Check if timestamp has retired here because we may have hit
+	 * recovery which can take some time and cause waiting threads
+	 * to timeout
+	 */
+	if (kgsl_check_timestamp(device, context, timestamp))
+		goto done;
 	status = -ETIMEDOUT;
 	KGSL_DRV_ERR(device,
 		     "Device hang detected while waiting for timestamp: "
