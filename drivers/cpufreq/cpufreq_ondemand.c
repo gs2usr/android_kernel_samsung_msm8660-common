@@ -42,7 +42,7 @@
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
 #define MIN_FREQUENCY_DOWN_DIFFERENTIAL		(1)
-#define DEFAULT_FREQ_BOOST_TIME			(2500000)
+#define DEFAULT_FREQ_BOOST_TIME			(500000)
 
 u64 freq_boosted_time;
 
@@ -147,6 +147,7 @@ static struct dbs_tuners {
 	.ignore_nice = 0,
 	.powersave_bias = 0,
 	.freq_boost_time = DEFAULT_FREQ_BOOST_TIME,
+	.boostfreq = MAX_FREQ_LIMIT,
 };
 
 static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
@@ -549,39 +550,6 @@ static ssize_t store_powersave_bias(struct kobject *a, struct attribute *b,
 	return count;
 }
 
-static void dbs_boost()
-{
-	int i;
-
-	if ((dbs_tuners_ins.powersave_bias == POWERSAVE_BIAS_MAXLEVEL) ||
-		(dbs_tuners_ins.powersave_bias == POWERSAVE_BIAS_MINLEVEL)) {
-		/* nothing to do */
-		return;
-	}
-
-	for_each_online_cpu(i) {
-		queue_work_on(i, input_wq, &per_cpu(dbs_refresh_work, i));
-	}
-}
-
-static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
-						  const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	dbs_boost();
-
-	return count;
-}
-
-static struct global_attr boostpulse =
-		__ATTR(boostpulse, 0200, NULL, store_boostpulse);
-
 define_one_global_rw(sampling_rate);
 define_one_global_rw(io_is_busy);
 define_one_global_rw(up_threshold);
@@ -603,11 +571,8 @@ static struct attribute *dbs_attributes[] = {
 	&powersave_bias.attr,
 	&io_is_busy.attr,
 	&boostpulse.attr,
-<<<<<<< HEAD
 	&boosttime.attr,
 	&boostfreq.attr,
-=======
->>>>>>> 92f4e71c25e3924f96a1fde8a53ec95935d956ce
 	NULL
 };
 
@@ -932,8 +897,8 @@ static void dbs_refresh_callback(struct work_struct *unused)
 static void dbs_input_event(struct input_handle *handle, unsigned int type,
 		unsigned int code, int value)
 {
+	int i;
 
-<<<<<<< HEAD
 	if ((dbs_tuners_ins.powersave_bias == POWERSAVE_BIAS_MAXLEVEL) ||
 		(dbs_tuners_ins.powersave_bias == POWERSAVE_BIAS_MINLEVEL)) {
 		/* nothing to do */
@@ -949,25 +914,6 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 	for_each_online_cpu(i) {
 		queue_work_on(i, input_wq, &per_cpu(dbs_refresh_work, i));
 	}
-=======
-#if 1 /* samsung feature */
-	int found = 0;
-
-	/* only sec touchevent */
-	if (!strncmp(handle->dev->name,
-			"sec_touchscreen", strlen("sec_touchscreen"))) {
-		found = 1;
-	} else if (!strncmp(handle->dev->name,
-			"sec_e-pen", strlen("sec_e-pen"))) {
-		found = 1;
-	}
-
-	if(!found)
-		return;
-#endif
-
-	dbs_boost();
->>>>>>> 92f4e71c25e3924f96a1fde8a53ec95935d956ce
 }
 
 static int dbs_input_connect(struct input_handler *handler,
@@ -1079,8 +1025,10 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				    latency * LATENCY_MULTIPLIER);
 			dbs_tuners_ins.io_is_busy = should_io_be_busy();
 		}
+#if 0
 		if (!cpu)
 			rc = input_register_handler(&dbs_input_handler);
+#endif
 		mutex_unlock(&dbs_mutex);
 
 		mutex_init(&this_dbs_info->timer_mutex);
@@ -1101,8 +1049,10 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		/* If device is being removed, policy is no longer
 		 * valid. */
 		this_dbs_info->cur_policy = NULL;
+#if 0
 		if (!cpu)
 			input_unregister_handler(&dbs_input_handler);
+#endif
 		mutex_unlock(&dbs_mutex);
 		if (!dbs_enable)
 			sysfs_remove_group(cpufreq_global_kobject,
