@@ -250,6 +250,7 @@ config ARCH_FSM9XXX
 config ARCH_MSM9615
 	bool "MSM9615"
 	select ARM_GIC
+	select GIC_SECURE
 	select ARCH_MSM_CORTEX_A5
 	select CPU_V7
 	select MSM_V2_TLMM
@@ -2173,11 +2174,6 @@ config CLOCK_MAP
 	  A bitmap is maintained in non-cached memory and each registered
 	  clock gets a unique id. If the bitmap has that bit set the clock
 	  is enabled, otherwise the clock is disabled.
-
-config MSM_SLEEP_STATS
-	bool "Enable exporting of MSM sleep stats to userspace"
-	depends on CPU_IDLE
-	default n
 
 config MSM_SLEEP_STATS_DEVICE
 	bool "Enable exporting of MSM sleep device stats to userspace"
